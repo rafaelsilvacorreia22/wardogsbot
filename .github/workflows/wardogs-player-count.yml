@@ -2,7 +2,7 @@ name: WARDOGS - Jogadores online
 
 on:
   schedule:
-    - cron: "0 22 * * *" # 19h no horario de Brasilia (UTC-3, sem horario de verao)
+    - cron: "5 22 * * *" # 19h05 no horario de Brasilia (UTC-3) — alguns minutos apos a hora cheia pra evitar atraso/descarte do GitHub
   workflow_dispatch: {}
 
 jobs:
