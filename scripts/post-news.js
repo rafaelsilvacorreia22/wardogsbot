@@ -20,10 +20,29 @@ function saveState(state) {
 
 function stripHtml(str) {
   return str
-    .replace(/\[[^\]]*\]/g, "") // remove tags tipo [b] [i] do BBCode da Steam
+    .replace(/\[[^\]]*\]/g, "")
     .replace(/<[^>]*>/g, "")
     .replace(/\s+\n/g, "\n")
     .trim();
+}
+
+// traduz um texto (ingles) pra portugues do Brasil usando o endpoint publico e
+// gratuito do Google Translate (sem precisar de chave de API). Se falhar por
+// qualquer motivo, devolve o texto original em ingles em vez de quebrar o bot.
+async function translateToPtBr(text) {
+  if (!text) return text;
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=pt&dt=t&q=${encodeURIComponent(
+      text
+    )}`;
+    const res = await fetch(url);
+    if (!res.ok) return text;
+    const data = await res.json();
+    return data[0].map((chunk) => chunk[0]).join("");
+  } catch (err) {
+    console.log("Falha ao traduzir, usando texto original:", err.message);
+    return text;
+  }
 }
 
 async function main() {
@@ -40,25 +59,38 @@ async function main() {
   const data = await res.json();
   const items = data?.appnews?.newsitems ?? [];
 
-  // so posts oficiais do desenvolvedor (Bulkhead) na propria pagina Steam da comunidade,
-  // sem misturar materia de imprensa (Rock Paper Shotgun, PCGamesN, SteamDB etc.)
   const officialItems = items.filter((item) => item.feedname === "steam_community_announcements");
 
   const state = loadState();
   const posted = new Set(state.postedGids ?? []);
 
-  // posta do mais antigo pro mais novo, pra manter ordem cronologica no canal
-  const newItems = officialItems.filter((item) => !posted.has(item.gid)).sort((a, b) => a.date - b.date);
+  const isManualRun = process.env.GITHUB_EVENT_NAME === "workflow_dispatch";
 
-  if (newItems.length === 0) {
-    console.log("Nenhuma noticia nova.");
-    return;
+  let itemsToPost;
+  if (isManualRun) {
+    const latest = officialItems[0];
+    itemsToPost = latest ? [latest] : [];
+    if (itemsToPost.length === 0) {
+      console.log("Nenhuma noticia oficial encontrada.");
+      return;
+    }
+  } else {
+    itemsToPost = officialItems.filter((item) => !posted.has(item.gid)).sort((a, b) => a.date - b.date);
+    if (itemsToPost.length === 0) {
+      console.log("Nenhuma noticia nova.");
+      return;
+    }
   }
 
-  for (const item of newItems) {
-    const summary = stripHtml(item.contents).slice(0, 500);
-    const content = `📰 **WARDOGS — ${item.title}**\n${summary}${
-      summary.length >= 500 ? "…" : ""
+  for (const item of itemsToPost) {
+    const rawSummary = stripHtml(item.contents);
+    const [translatedTitle, translatedSummaryFull] = await Promise.all([
+      translateToPtBr(item.title),
+      translateToPtBr(rawSummary),
+    ]);
+    const summary = translatedSummaryFull.slice(0, 500);
+    const content = `📰 **WARDOGS — ${translatedTitle}**\n${summary}${
+      translatedSummaryFull.length > 500 ? "…" : ""
     }\n${item.url}`;
 
     const postRes = await fetch(WEBHOOK_URL, {
@@ -75,7 +107,7 @@ async function main() {
     console.log("Postado:", item.title);
   }
 
-  state.postedGids = Array.from(posted).slice(-50); // guarda só os ultimos 50 ids
+  state.postedGids = Array.from(posted).slice(-50);
   saveState(state);
 }
 
