@@ -1,0 +1,10 @@
+{
+  "name": "wardogs-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Posta contagem de jogadores e noticias do WARDOGS (Steam) no Discord via webhook, rodando em GitHub Actions.",
+  "engines": {
+    "node": ">=20"
+  }
+}
