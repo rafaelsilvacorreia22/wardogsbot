@@ -6,6 +6,9 @@ on:
     - cron: "20 17 * * 6,0" # 14h20 no horario de Brasilia (UTC-3), sabado e domingo
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 jobs:
   post:
     runs-on: ubuntu-latest
@@ -17,3 +20,10 @@ jobs:
       - run: node scripts/post-player-count.js
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      - name: Salvar id da ultima mensagem
+        run: |
+          git config user.name "wardogs-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add scripts/player-count-state.json
+          git diff --cached --quiet || git commit -m "chore: atualiza id da ultima mensagem de contagem"
+          git push
