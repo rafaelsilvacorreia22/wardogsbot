@@ -16,7 +16,7 @@ Roda 100% no GitHub Actions — depois de configurado, funciona sozinho, sem pre
 ## Como funciona por baixo dos panos
 
 - **Steam Web API** (pública, sem chave): número de jogadores online (`ISteamUserStats/GetNumberOfCurrentPlayers`) e notícias (`ISteamNews/GetNewsForApp`), App ID do WARDOGS: `1867240`.
-- **Tradução**: endpoint público e gratuito do Google Translate (sem chave de API). Se ele falhar por qualquer motivo, o bot manda o texto original em inglês em vez de quebrar.
+- **Tradução**: usa a API gratuita do MyMemory como serviço principal (sem chave de API, traduz bem textos curtos). Se ela falhar ou recusar (ex: texto longo demais), cai pro endpoint público do Google Translate como reserva. Se os dois falharem, o bot manda o texto original em inglês em vez de quebrar.
 - **Webhook do Discord**: cada script posta direto no canal via `DISCORD_WEBHOOK_URL` (guardado como Secret do repositório, nunca aparece no código).
 - **Estado entre execuções**: como cada execução do GitHub Actions começa "do zero", os scripts guardam informação em arquivos JSON (`scripts/state.json` e `scripts/player-count-state.json`) que são commitados de volta no repositório automaticamente pelo próprio workflow.
 
