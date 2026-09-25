@@ -52,7 +52,9 @@ async function translateWithGoogle(text) {
   const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=pt&dt=t&q=${encodeURIComponent(
     text
   )}`;
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+  });
   if (!res.ok) {
     throw new Error(`Google Translate respondeu ${res.status}`);
   }
@@ -125,13 +127,16 @@ async function main() {
 
   for (const item of itemsToPost) {
     const rawSummary = stripHtml(item.contents);
-    const [translatedTitle, translatedSummaryFull] = await Promise.all([
+    // corta o texto ANTES de traduzir (nao depois): a API gratuita do MyMemory
+    // recusa textos longos, e so mostramos um trecho no Discord mesmo, entao nao
+    // faz sentido mandar o texto inteiro pra traduzir
+    const summaryToTranslate = rawSummary.length > 480 ? rawSummary.slice(0, 480) : rawSummary;
+    const [translatedTitle, translatedSummary] = await Promise.all([
       translateToPtBr(item.title),
-      translateToPtBr(rawSummary),
+      translateToPtBr(summaryToTranslate),
     ]);
-    const summary = translatedSummaryFull.slice(0, 500);
-    const content = `📰 **WARDOGS — ${translatedTitle}**\n${summary}${
-      translatedSummaryFull.length > 500 ? "…" : ""
+    const content = `📰 **WARDOGS — ${translatedTitle}**\n${translatedSummary}${
+      rawSummary.length > 480 ? "…" : ""
     }\n${item.url}`;
 
     const postRes = await fetch(WEBHOOK_URL, {
