@@ -18,6 +18,35 @@ function saveState(state) {
   writeFileSync(STATE_PATH, JSON.stringify(state, null, 2) + "\n");
 }
 
+// icone da linha do ouro. Pra usar um emoji customizado do servidor, troque por
+// "<:nome_do_emoji:ID_DO_EMOJI>" (no Discord: digite \:nome_do_emoji: pra ver o codigo)
+const GOLD_ICON = "🪙";
+
+// preco atual da barra de ouro (em cash do jogo), vindo do MetaForge. Se falhar
+// por qualquer motivo, devolve null e o bot posta so a contagem de jogadores.
+async function fetchGoldPrice() {
+  try {
+    const res = await fetch("https://metaforge.app/api/wardogs/market", {
+      headers: {
+        "User-Agent": "wardogs-discord-bot (+https://github.com/rafaelsilvacorreia22/wardogsbot)",
+        Accept: "application/json",
+      },
+    });
+    if (!res.ok) {
+      throw new Error(`MetaForge respondeu ${res.status}`);
+    }
+    const data = await res.json();
+    const price = data?.stats?.current ?? data?.points?.at(-1)?.price;
+    if (typeof price !== "number") {
+      throw new Error("resposta do MetaForge sem preco valido");
+    }
+    return price;
+  } catch (err) {
+    console.log("Nao consegui buscar o valor do ouro:", err.message);
+    return null;
+  }
+}
+
 async function main() {
   if (!WEBHOOK_URL) {
     throw new Error("DISCORD_WEBHOOK_URL nao definido (configure como secret no GitHub Actions).");
@@ -39,6 +68,8 @@ async function main() {
 
   const state = loadState();
 
+  // apaga a mensagem de contagem anterior antes de postar a nova, pra nao acumular
+  // varias mensagens de contagem no canal
   if (state.lastMessageId) {
     const deleteRes = await fetch(`${WEBHOOK_URL}/messages/${state.lastMessageId}`, {
       method: "DELETE",
@@ -51,8 +82,15 @@ async function main() {
   }
 
   const formatted = count.toLocaleString("pt-BR");
-  const content = `🐺 **WARDOGS** agora: **${formatted}** jogadores online na Steam`;
+  let content = `🐺 **WARDOGS** agora: **${formatted}** jogadores online na Steam`;
 
+  const goldPrice = await fetchGoldPrice();
+  if (goldPrice !== null) {
+    content += `\n${GOLD_ICON} Valor do ouro hoje: **$${goldPrice.toLocaleString("pt-BR")}**`;
+  }
+
+  // ?wait=true faz o Discord devolver a mensagem criada (com o id dela), em vez de
+  // uma resposta vazia
   const postRes = await fetch(`${WEBHOOK_URL}?wait=true`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
